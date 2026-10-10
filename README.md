@@ -56,17 +56,17 @@ Keep the frontend dev server running in another terminal at http://localhost:300
 
 Run `backend/` and Postgres (see `docker-compose.yml`; `api` + `db` services are enough). Put it behind HTTPS at e.g. `https://api.example.com`, with a persistent volume at `/data`. Environment:
 
-| Variable | Value |
-| --- | --- |
-| `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/db` |
-| `SECRET_KEY` | 32+ random characters |
-| `COOKIE_SECURE` | `true` |
-| `TRUST_PROXY` | `true` if behind a proxy you control (correct per-IP rate limits) |
-| `CORS_ORIGINS` | `https://your-app.vercel.app` (and your custom domain), comma separated |
-| `CORS_ORIGIN_REGEX` | optional, `https://.*\.vercel\.app` to allow preview deployments |
-| `PUBLIC_BASE_URL` | origin used in copied GIF links (see below) |
-| `UPLOAD_BASE_URL` | **the API origin**, `https://api.example.com` |
-| `WEB_BASE_URL` | `https://your-app.vercel.app` |
+| Variable            | Value                                                                   |
+| ------------------- | ----------------------------------------------------------------------- |
+| `DATABASE_URL`      | `postgresql+psycopg://user:pass@host:5432/db`                           |
+| `SECRET_KEY`        | 32+ random characters                                                   |
+| `COOKIE_SECURE`     | `true`                                                                  |
+| `TRUST_PROXY`       | `true` if behind a proxy you control (correct per-IP rate limits)       |
+| `CORS_ORIGINS`      | `https://your-app.vercel.app` (and your custom domain), comma separated |
+| `CORS_ORIGIN_REGEX` | optional, `https://.*\.vercel\.app` to allow preview deployments        |
+| `PUBLIC_BASE_URL`   | origin used in copied GIF links (see below)                             |
+| `UPLOAD_BASE_URL`   | **the API origin**, `https://api.example.com`                           |
+| `WEB_BASE_URL`      | `https://your-app.vercel.app`                                           |
 
 `PUBLIC_BASE_URL` choice: the API origin keeps GIF traffic off Vercel (cheapest, fastest). Your Vercel domain gives prettier same-domain links (`your-app.com/g/cat_edit.gif`), but every GIF view is proxied through Vercel and counts against its bandwidth. Either works. `UPLOAD_BASE_URL` must always be the API itself.
 
@@ -94,13 +94,13 @@ There are no native or Vercel-specific dependencies: only `next`, `react` and `r
 
 ## Limits (all configurable)
 
-| | Default |
-| --- | --- |
-| Upload size | 2 GB |
-| Source duration | unlimited |
-| Clip length | 0.2 s to 60 s |
-| Output width | up to 1280 px |
-| GIF size | 64 MB |
+|                    | Default                            |
+| ------------------ | ---------------------------------- |
+| Upload size        | 2 GB                               |
+| Source duration    | unlimited                          |
+| Clip length        | 0.2 s to 60 s                      |
+| Output width       | up to 1280 px                      |
+| GIF size           | 125 MB                             |
 | Source videos kept | 72 h after last use, 8 GB per user |
 
 ## Security notes
