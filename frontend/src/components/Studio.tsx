@@ -352,7 +352,7 @@ export function Studio({ edit }: { edit?: Gif }) {
                 {seconds(clipLen)} · {frames} frames{effH ? ` · ${effW}×${effH}` : ""}
               </p>
               {frames > 900 && (
-                <p className="text-xs text-accent">That&apos;s a lot of frames. Lower the frame rate or width to keep the GIF under {config?.max_gif_mb ?? 64} MB.</p>
+                <p className="text-xs text-accent">That&apos;s a lot of frames. Lower the frame rate or width to keep the GIF under {config?.max_gif_mb ?? 125} MB.</p>
               )}
             </section>
 

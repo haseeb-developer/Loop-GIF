@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     min_clip_s: float = 0.2
     max_clip_s: int = 60
     max_output_width: int = 1280
-    max_gif_mb: int = 64
+    max_gif_mb: int = 125
 
     # Rate limits
     source_limit_per_hour: int = 30
