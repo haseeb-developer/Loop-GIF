@@ -22,6 +22,8 @@ STATEMENTS = [
 
 
 def run(engine: Engine) -> None:
+    if engine.dialect.name != "postgresql":
+        return
     with engine.begin() as conn:
         for stmt in STATEMENTS:
             conn.execute(text(stmt))

@@ -1,16 +1,19 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, SmallInteger, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, JSON, SmallInteger, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
+ID_TYPE = BigInteger().with_variant(Integer, "sqlite")
+JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
+
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(80))
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -25,7 +28,7 @@ class Source(Base):
 
     __tablename__ = "sources"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # internal only
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True)  # internal only
     public_id: Mapped[str] = mapped_column(String(16), unique=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     filename: Mapped[str] = mapped_column(String(255))
@@ -47,7 +50,7 @@ class Gif(Base):
     __tablename__ = "gifs"
     __table_args__ = (Index("ix_gifs_user_updated", "user_id", "updated_at"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # internal only, never exposed
+    id: Mapped[int] = mapped_column(ID_TYPE, primary_key=True)  # internal only, never exposed
     public_id: Mapped[str] = mapped_column(String(16), unique=True, index=True)  # permanent random URL id
     slug: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)  # optional vanity URL name
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -62,8 +65,8 @@ class Gif(Base):
     error: Mapped[str | None] = mapped_column(Text)
     revision: Mapped[int] = mapped_column(Integer, default=1)
 
-    settings: Mapped[dict] = mapped_column(JSONB)  # settings of the file currently served
-    pending_settings: Mapped[dict | None] = mapped_column(JSONB)  # settings of the running/failed job
+    settings: Mapped[dict] = mapped_column(JSON_TYPE)  # settings of the file currently served
+    pending_settings: Mapped[dict | None] = mapped_column(JSON_TYPE)  # settings of the running/failed job
     width: Mapped[int | None] = mapped_column(Integer)
     height: Mapped[int | None] = mapped_column(Integer)
     duration_ms: Mapped[int | None] = mapped_column(Integer)

@@ -31,6 +31,25 @@ Open http://localhost:3000. GIFs are served from `http://localhost:8000/g/<name>
 
 Without Docker for the web app: `cd frontend && npm install && npm run dev` (set `API_ORIGIN=http://localhost:8000`). The API needs Postgres and FFmpeg: `cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload`.
 
+For a small local-only setup without Docker or PostgreSQL, the API also supports SQLite. In PowerShell, run from the repository root:
+
+```powershell
+Set-Location backend
+python -m pip install -r requirements.txt
+$env:DATABASE_URL = "sqlite:///./loop-dev.db"
+$secretBytes = [byte[]]::new(48)
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($secretBytes)
+$env:SECRET_KEY = [Convert]::ToBase64String($secretBytes)
+$rng.Dispose()
+$env:STORAGE_DIR = "./data/media"
+$env:SOURCE_DIR = "./data/sources"
+$env:TMP_DIR = "./data/tmp"
+python -m uvicorn app.main:app --reload
+```
+
+Keep the frontend dev server running in another terminal at http://localhost:3000. SQLite creates a new local database, so create an account at `/signup` before signing in. This is intended for local development; use PostgreSQL for deployment.
+
 ## Deploy: GitHub → Vercel (web) + Docker host (API)
 
 ### 1. API (Docker host)
