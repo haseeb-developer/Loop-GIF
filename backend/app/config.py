@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -62,6 +62,15 @@ class Settings(BaseSettings):
     frame_limit_per_minute: int = 240
     login_limit_per_15min: int = 10
     signup_limit_per_hour: int = 10
+
+    @model_validator(mode="after")
+    def resolve_storage_paths(self) -> "Settings":
+        # FFmpeg/ffprobe run with their working directory changed, so relative storage paths
+        # would point somewhere else (and fail to find uploaded files).
+        self.storage_dir = self.storage_dir.expanduser().resolve()
+        self.source_dir = self.source_dir.expanduser().resolve()
+        self.tmp_dir = self.tmp_dir.expanduser().resolve()
+        return self
 
     @property
     def upload_origin(self) -> str:

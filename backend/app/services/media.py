@@ -96,6 +96,8 @@ def _probe(path: Path, timeout: int = 60) -> dict:
     except subprocess.TimeoutExpired:
         raise MediaError("Reading this video took too long.") from None
     if out.returncode != 0:
+        log.warning("ffprobe rejected %s (exit %s): %s", path.name, out.returncode,
+                    out.stderr.decode(errors="replace")[-1000:].strip())
         raise MediaError("This file isn't a readable video.", 415)
     try:
         return json.loads(out.stdout)
