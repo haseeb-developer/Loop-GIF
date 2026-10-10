@@ -377,7 +377,16 @@ export function Studio({ edit }: { edit?: Gif }) {
       )}
 
       {phase === "edit" && !duration && (
-        <div className="grid place-items-center py-24 text-dim"><Spinner className="h-5 w-5" /></div>
+        <div className="mx-auto w-full max-w-xl space-y-4 py-16">
+          <UploadStatus file={file} source={source} up={up} brief={brief} onRetry={() => file && void startUpload(file)} onChoose={chooseAnother} />
+          {up.state !== "error" && (
+            <p className="text-center text-sm text-dim">
+              {up.state === "uploading" || up.state === "processing"
+                ? "Configure will be ready when the video finishes uploading and is checked."
+                : "Loading video details…"}
+            </p>
+          )}
+        </div>
       )}
 
       {phase === "converting" && (
