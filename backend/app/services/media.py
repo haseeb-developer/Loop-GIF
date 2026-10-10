@@ -11,6 +11,7 @@ graph, because `split` + `palettegen` makes FFmpeg buffer every frame of the cli
 """
 import json
 import logging
+import math
 import os
 import subprocess
 import tempfile
@@ -61,7 +62,7 @@ def _env() -> dict[str, str]:
 def _num(v: object) -> float | None:
     try:
         f = float(v)  # type: ignore[arg-type]
-        return f if f == f and f not in (float("inf"), float("-inf")) else None
+        return f if math.isfinite(f) else None
     except (TypeError, ValueError):
         return None
 
@@ -102,7 +103,7 @@ def _probe(path: Path, timeout: int = 60) -> dict:
            "-show_format", "-show_streams", str(path)]
     try:
         out = subprocess.run(cmd, capture_output=True, timeout=timeout, env=_env(), cwd=tempfile.gettempdir(),
-                             stdin=subprocess.DEVNULL)
+                             stdin=subprocess.DEVNULL, check=False)
     except subprocess.TimeoutExpired:
         raise MediaError("Reading this video took too long.") from None
     if out.returncode != 0:
@@ -126,7 +127,7 @@ def scan_duration(path: Path, timeout: int = 900) -> float | None:
            "-progress", "pipe:1", "-f", "null", "-"]
     try:
         out = subprocess.run(cmd, capture_output=True, timeout=timeout, env=_env(), cwd=tempfile.gettempdir(),
-                             stdin=subprocess.DEVNULL, text=True)
+                             stdin=subprocess.DEVNULL, text=True, check=False)
     except subprocess.TimeoutExpired:
         return None
     last = None
@@ -380,10 +381,12 @@ def make_poster(gif: Path, dst: Path, at: float = 0.0, max_width: int = 800) -> 
     cmd = [settings.ffmpeg_bin, "-hide_banner", "-nostdin", "-loglevel", "error", "-protocol_whitelist", "file",
            "-ss", f"{max(0.0, at):.3f}", "-i", str(gif), "-frames:v", "1", "-vf", scale, "-q:v", "5", "-f", "image2",
            "-y", str(dst)]
-    r = subprocess.run(cmd, capture_output=True, timeout=30, env=_env(), cwd=dst.parent, stdin=subprocess.DEVNULL)
+    r = subprocess.run(cmd, capture_output=True, timeout=30, env=_env(), cwd=dst.parent,
+                       stdin=subprocess.DEVNULL, check=False)
     if r.returncode != 0 or not dst.exists():  # seeking past a very short GIF: fall back to the first frame
         cmd[cmd.index("-ss") + 1] = "0"
-        r = subprocess.run(cmd, capture_output=True, timeout=30, env=_env(), cwd=dst.parent, stdin=subprocess.DEVNULL)
+        r = subprocess.run(cmd, capture_output=True, timeout=30, env=_env(), cwd=dst.parent,
+                   stdin=subprocess.DEVNULL, check=False)
         if r.returncode != 0 or not dst.exists():
             raise MediaError("Couldn't create the preview image.", 500)
 
@@ -397,7 +400,7 @@ def frame_jpeg(src: Path, t: float, width: int) -> bytes:
         raise MediaError("Preview is busy. Try again.", 503)
     try:
         r = subprocess.run(cmd, capture_output=True, timeout=30, env=_env(), cwd=tempfile.gettempdir(),
-                           stdin=subprocess.DEVNULL)
+                           stdin=subprocess.DEVNULL, check=False)
     except subprocess.TimeoutExpired:
         raise MediaError("Preview took too long.", 504) from None
     finally:

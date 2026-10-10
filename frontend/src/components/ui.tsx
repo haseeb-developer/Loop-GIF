@@ -263,7 +263,7 @@ export function CopyField({ label, value, hint, mono = true }: { label: string; 
         <input id={id} readOnly value={value} onFocus={(e) => e.currentTarget.select()}
           className={cx("h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-bg px-3 text-sm transition duration-150 focus:border-accent focus:outline-none",
             mono && "font-mono text-[13px]")} />
-        <Button variant={copied ? "secondary" : "primary"} className="min-w-[5.5rem]" onClick={copy}>
+        <Button variant={copied ? "secondary" : "primary"} className="min-w-22" onClick={copy}>
           {copied ? <><CheckIcon />Copied</> : <><CopyIcon />Copy</>}
         </Button>
       </div>

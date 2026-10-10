@@ -83,7 +83,7 @@ function RenameBody({ gif, config, onSaved, onClose }: { gif: Gif; config: AppCo
       <Field label="Name" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus />
       <SlugField value={slug} onChange={setSlug} onValid={setSlugOk} config={config} gifId={gif.id} />
       {gif.slug && slug !== gif.slug && (
-        <p className="rounded-lg border border-accent/30 bg-accent/[0.05] p-3 text-xs text-dim">
+        <p className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs text-dim">
           Links that use <span className="font-mono text-fg">{gif.slug}</span> will stop working. Anyone could claim that name afterwards.
           The random link <span className="font-mono text-fg">{gif.id}</span> never changes.
         </p>

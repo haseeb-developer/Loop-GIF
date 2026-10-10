@@ -41,7 +41,7 @@ export function Dropzone({ config, onFile }: { config: AppConfig | null; onFile:
         onDrop={(e) => { e.preventDefault(); setOver(false); accept(e.dataTransfer.files[0]); }}
         className={cx(
           "group flex min-h-[340px] cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border px-6 text-center transition duration-200",
-          over ? "border-solid border-accent bg-accent/[0.06]" : "border-dashed border-line-strong hover:border-dim hover:bg-raised")}>
+          over ? "border-solid border-accent bg-accent/6" : "border-dashed border-line-strong hover:border-dim hover:bg-raised")}>
         <span className={cx("grid h-14 w-14 place-items-center rounded-full border transition duration-200",
           over ? "-translate-y-1 border-accent text-accent" : "border-line-strong text-dim group-hover:text-fg")}>
           {over ? <FilmIcon className="h-6 w-6" /> : <UploadIcon className="h-6 w-6" />}

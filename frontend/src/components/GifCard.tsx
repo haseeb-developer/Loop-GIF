@@ -46,7 +46,7 @@ function Thumb({ g, hover }: { g: Gif; hover: boolean }) {
         </div>
       )}
       {active && (
-        <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
+        <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-linear-to-t from-black/80 to-transparent p-3 pt-8">
           <p className="text-xs text-fg">{g.stage === "queued" ? "Waiting…" : g.stage === "encoding" ? `Encoding ${g.progress}%` : "Working…"}</p>
           <Progress value={g.progress / 100} indeterminate={g.stage === "queued" || g.stage === "analyzing"} />
         </div>

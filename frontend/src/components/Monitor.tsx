@@ -76,7 +76,7 @@ export function Monitor({ localUrl, sourceId, start, end, duration, speed, seek,
 
   return (
     <div className="space-y-2.5">
-      <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden rounded-xl border border-line bg-black">
+      <div className="relative flex min-h-55 items-center justify-center overflow-hidden rounded-xl border border-line bg-black">
         {mode === "video" && (
           <video ref={video} src={localUrl ?? undefined} muted loop playsInline preload="auto" onClick={toggle}
             className="max-h-[62vh] w-full cursor-pointer object-contain"

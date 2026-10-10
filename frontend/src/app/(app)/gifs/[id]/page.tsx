@@ -54,7 +54,7 @@ export default function GifPage() {
     </div>
   );
   if (error && !gif) return <div className="mx-auto max-w-lg space-y-4"><Notice tone="danger" title="Couldn't load this GIF">{error}</Notice><Button onClick={() => void load()}>Retry</Button></div>;
-  if (!gif) return <div className="grid gap-8 lg:grid-cols-[1fr_440px]"><Skeleton className="h-[420px]" /><div className="space-y-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-24" /></div></div>;
+  if (!gif) return <div className="grid gap-8 lg:grid-cols-[1fr_440px]"><Skeleton className="h-[420]" /><div className="space-y-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-24" /></div></div>;
 
   const back = (
     <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="-ml-2"><ChevronLeftIcon />Library</Button>

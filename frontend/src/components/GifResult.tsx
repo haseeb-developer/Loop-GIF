@@ -36,7 +36,7 @@ export function GifResult({ gif, heading, onUpdated, onDeleted, footer, children
         <div className="space-y-2.5">
           {heading && <Badge tone="ok">{heading}</Badge>}
           <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight">{gif.title}</h2>
+            <h2 className="min-w-0 flex-1 wrap-break-word text-2xl font-semibold tracking-tight">{gif.title}</h2>
             <Button variant="ghost" size="icon" onClick={() => dialogs.open("rename", gif)} aria-label="Rename and change URL" title="Rename and change URL">
               <PencilIcon />
             </Button>
