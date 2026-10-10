@@ -63,12 +63,12 @@ Vercel deploys the Next.js frontend only. The FastAPI backend cannot run as a Ve
 
 | Variable            | Value                                                                 |
 | ------------------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`      | `${{Postgres.DATABASE_URL}}` (Railway variable reference)              |
+| `DATABASE_URL`      | `${{Postgres.DATABASE_URL}}` (Railway variable reference)             |
 | `SECRET_KEY`        | At least 32 random characters                                         |
 | `COOKIE_SECURE`     | `true`                                                                |
 | `TRUST_PROXY`       | `true` when Railway's trusted proxy supplies client IPs               |
 | `CORS_ORIGINS`      | Exact Vercel production origin and custom web domain, comma separated |
-| `CORS_ORIGIN_REGEX` | Optional: `https://.*\.vercel\.app` for preview deployments          |
+| `CORS_ORIGIN_REGEX` | Optional: `https://.*\.vercel\.app` for preview deployments           |
 | `PUBLIC_BASE_URL`   | Public API origin, e.g. `https://loop-api-production.up.railway.app`  |
 | `UPLOAD_BASE_URL`   | The same public API origin; video chunks upload directly here         |
 | `WEB_BASE_URL`      | Vercel production origin, e.g. `https://loop-gif.vercel.app`          |
