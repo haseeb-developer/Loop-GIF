@@ -265,15 +265,28 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
 
     # Pass 2: encode with that palette. Real progress comes from FFmpeg's own output position.
     on_progress("encoding", 0.0)
-    graph = (f"[0:v]fps={fps},scale={width}:-2:flags=lanczos[x];"
-             f"[x][1:v]paletteuse=dither={q['dither']}:diff_mode=rectangle")
-    code, reason, tail = _run_ffmpeg(
-        head + seek + ["-i", str(palette), "-an", "-sn", "-dn", "-map_metadata", "-1", "-lavfi", graph,
-                       "-loop", "0", "-progress", "pipe:1", "-f", "gif", "-y", str(dst)],
-        cancel=cancel, timeout=settings.ffmpeg_timeout_s, cwd=workdir,
-        on_frac=lambda f: on_progress("encoding", f), total_us=length * 1_000_000,
-        stall=settings.ffmpeg_stall_s, size_path=dst)
-    check(code, reason, tail, "encode")
+    encoded_width = width
+    while True:
+        graph = (f"[0:v]fps={fps},scale={encoded_width}:-2:flags=lanczos[x];"
+                 f"[x][1:v]paletteuse=dither={q['dither']}:diff_mode=rectangle")
+        code, reason, tail = _run_ffmpeg(
+            head + seek + ["-i", str(palette), "-an", "-sn", "-dn", "-map_metadata", "-1", "-lavfi", graph,
+                           "-loop", "0", "-progress", "pipe:1", "-f", "gif", "-y", str(dst)],
+            cancel=cancel, timeout=settings.ffmpeg_timeout_s, cwd=workdir,
+            on_frac=lambda f: on_progress("encoding", f), total_us=length * 1_000_000,
+            stall=settings.ffmpeg_stall_s, size_path=dst)
+        too_large = reason == "size"
+        if not too_large and code == 0 and dst.is_file():
+            too_large = dst.stat().st_size > settings.max_gif_bytes
+        if not too_large or encoded_width <= 320:
+            check(code, reason, tail, "encode")
+            break
+        # Retry with a smaller image rather than failing an otherwise valid conversion at the size cap.
+        encoded_width = max(320, (int(encoded_width * 0.8) // 2) * 2)
+        log.info("GIF exceeded %s MB; retrying at %s px wide", settings.max_gif_mb, encoded_width)
+
+    if encoded_width != width:
+        cfg["width"] = encoded_width
     if not dst.exists():
         raise MediaError("Conversion failed. Try different settings.", 500)
     palette.unlink(missing_ok=True)
@@ -285,7 +298,7 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
     info = _probe(dst, timeout=30)
     vs = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     real = _num(info.get("format", {}).get("duration")) or length
-    return GifResult(width=int(vs.get("width") or width), height=int(vs.get("height") or 0),
+    return GifResult(width=int(vs.get("width") or encoded_width), height=int(vs.get("height") or 0),
                      duration_ms=int(real * 1000), size_bytes=size)
 
 

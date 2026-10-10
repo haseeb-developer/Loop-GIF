@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -19,19 +18,16 @@ from ..services.slugs import SLUG_MAX, SLUG_MIN, SlugError, validate_slug
 from ..services.sources import source_path
 from ..services.urls import gif_urls
 from ..storage import get_storage
+from ..timeutils import is_expired
 
 router = APIRouter(prefix="/api/gifs", tags=["gifs"])
 config_router = APIRouter(prefix="/api", tags=["config"])
 ACTIVE = ("queued", "processing")
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def gif_out(g: Gif, src: Source | None) -> GifOut:
     brief = None
-    if src is not None and src.status == "ready" and not (src.expires_at and src.expires_at <= _now()) \
+    if src is not None and src.status == "ready" and not is_expired(src.expires_at) \
             and source_path(src).is_file():
         brief = SourceBrief(id=src.public_id, filename=src.filename,
                             duration=src.duration_ms / 1000 if src.duration_ms else None,
@@ -107,7 +103,7 @@ def _ready_source(db: Session, user: User, public_id: str) -> Source:
         raise HTTPException(409, "The video is still being processed.")
     if src.status != "ready":
         raise HTTPException(422, src.error or "This video can't be used.")
-    if (src.expires_at and src.expires_at <= _now()) or not source_path(src).is_file():
+    if is_expired(src.expires_at) or not source_path(src).is_file():
         raise HTTPException(410, "This video has expired. Upload it again.")
     return src
 

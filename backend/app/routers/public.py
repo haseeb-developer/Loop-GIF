@@ -9,8 +9,6 @@ Responses use `no-cache` (store, but revalidate with the ETag every time) instea
 a deleted GIF can't linger in browsers or a CDN, while unchanged GIFs still cost only a 304.
 """
 import re
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import select
@@ -22,6 +20,7 @@ from ..models import Gif
 from ..schemas import PublicGif
 from ..services.urls import gif_urls
 from ..storage import get_storage
+from ..timeutils import is_expired
 
 router = APIRouter()
 FILE_RE = re.compile(r"^([0-9A-Za-z_-]{3,40})\.(gif|jpg)$")
@@ -39,7 +38,7 @@ def find_public(db: Session, name: str) -> Gif | None:
     else:
         cond = Gif.slug == name.lower()
     gif = db.scalar(select(Gif).where(cond, Gif.storage_key.is_not(None)))
-    if gif is None or (gif.expires_at and gif.expires_at <= datetime.now(timezone.utc)):
+    if gif is None or is_expired(gif.expires_at):
         return None
     return gif
 
