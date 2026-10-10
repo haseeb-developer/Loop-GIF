@@ -15,13 +15,14 @@ export interface MonitorProps {
   start: number;
   end: number;
   duration: number | null;
+  speed: number;
   seek: Seek;
   onPlayhead: (t: number) => void;
   onSeek: (t: number) => void;
   onMeta: (m: { duration: number; width: number; height: number }) => void;
 }
 
-export function Monitor({ localUrl, sourceId, start, end, duration, seek, onPlayhead, onSeek, onMeta }: MonitorProps) {
+export function Monitor({ localUrl, sourceId, start, end, duration, speed, seek, onPlayhead, onSeek, onMeta }: MonitorProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -31,6 +32,7 @@ export function Monitor({ localUrl, sourceId, start, end, duration, seek, onPlay
 
   const mode: "video" | "frames" | "pending" = localUrl && !failed ? "video" : sourceId ? "frames" : "pending";
   useEffect(() => { setFailed(false); setPlaying(false); }, [localUrl]);
+  useEffect(() => { if (video.current) video.current.playbackRate = speed; }, [speed]);
 
   // Show the requested time: pause and jump (video), or fetch that frame (server).
   useEffect(() => {
@@ -80,6 +82,7 @@ export function Monitor({ localUrl, sourceId, start, end, duration, seek, onPlay
             className="max-h-[62vh] w-full cursor-pointer object-contain"
             onLoadedMetadata={(e) => {
               const v = e.currentTarget;
+              v.playbackRate = speed;
               if (!v.videoWidth) return setFailed(true); // audio-only or a codec this browser can't draw
               onMeta({ duration: v.duration, width: v.videoWidth, height: v.videoHeight });
               v.currentTime = start;

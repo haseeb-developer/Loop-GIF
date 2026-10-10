@@ -17,6 +17,7 @@ type Embed = "html" | "markdown" | "bbcode";
 function ShareBody({ gif }: { gif: Gif }) {
   const [embed, setEmbed] = useState<Embed>("html");
   const share = shareUrlFor(gif);
+  const isLocalLink = /localhost|127\.0\.0\.1/i.test(gif.url);
   const alt = gif.title.replace(/["\]\[]/g, "");
   const snippet: Record<Embed, string> = {
     html: `<img src="${gif.url}" alt="${alt}"${gif.width ? ` width="${gif.width}"` : ""}>`,
@@ -30,6 +31,7 @@ function ShareBody({ gif }: { gif: Gif }) {
         hint="Rich preview card in WhatsApp, Slack, iMessage, X and more." />
       <CopyField label="Direct GIF link" value={gif.url}
         hint="Ends in .gif. Plays inline in Discord, forums and anywhere an image URL works." />
+      {isLocalLink && <p className="text-xs text-accent">This link is local to your computer; Discord can't reach localhost. Set PUBLIC_BASE_URL to a publicly accessible HTTPS URL for shared previews.</p>}
       <div className="space-y-3 border-t border-line pt-5">
         <Segmented label="Embed code" value={embed} onChange={setEmbed}
           options={[{ value: "html", label: "HTML" }, { value: "markdown", label: "Markdown" }, { value: "bbcode", label: "BBCode" }]} />
@@ -37,8 +39,8 @@ function ShareBody({ gif }: { gif: Gif }) {
       </div>
       <div className="flex flex-wrap gap-2 border-t border-line pt-5">
         {canShare && (
-          <Button variant="primary" onClick={() => void navigator.share({ title: gif.title, url: share }).catch(() => {})}>
-            <ShareIcon />Share…
+          <Button variant="primary" onClick={() => void navigator.share({ title: gif.title, url: gif.url }).catch(() => {})}>
+            <ShareIcon />Share GIF link
           </Button>
         )}
         <a href={share} target="_blank" rel="noreferrer"

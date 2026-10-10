@@ -122,6 +122,7 @@ export function Studio({ edit }: { edit?: Gif }) {
   const es = edit?.settings;
   const [range, setRange] = useState<R.Range>({ start: es?.start ?? 0, end: es?.end ?? ((es?.start ?? 0) + (es?.duration ?? 5)) });
   const [fps, setFps] = useState(es?.fps ?? 15);
+  const [speed, setSpeed] = useState(es?.speed ?? 1);
   const [width, setWidth] = useState(es?.width ?? 480);
   const [quality, setQuality] = useState<Quality>((es?.quality as Quality) ?? "balanced");
   const [title, setTitle] = useState(edit?.title ?? "");
@@ -182,7 +183,7 @@ export function Studio({ edit }: { edit?: Gif }) {
   const effW = srcW ? Math.min(width, srcW) : width;
   const effH = srcW && srcH ? Math.round((effW * srcH) / srcW / 2) * 2 : null;
   const clipLen = range.end - range.start;
-  const frames = Math.round(fps * clipLen);
+  const frames = Math.round(fps * speed * clipLen);
 
   /* -------- upload */
   const startUpload = useCallback(async (f: File) => {
@@ -240,7 +241,7 @@ export function Studio({ edit }: { edit?: Gif }) {
     const sourceId = source?.id ?? brief?.id;
     if (!sourceId || !L) return;
     setError(null); setSubmitting(true);
-    const settings = { start: range.start, end: range.end, fps, width: effW, quality };
+    const settings = { start: range.start, end: range.end, fps, width: effW, quality, speed };
     try {
       if (mode === "replace" && edit) {
         const patch: { title?: string; slug?: string | null } = {};
@@ -327,7 +328,7 @@ export function Studio({ edit }: { edit?: Gif }) {
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-6">
             <Monitor localUrl={localUrl} sourceId={sourceId} start={range.start} end={range.end} duration={duration}
-              seek={seek} onPlayhead={setPlayhead} onSeek={onScrub} onMeta={setMeta} />
+              speed={speed} seek={seek} onPlayhead={setPlayhead} onSeek={onScrub} onMeta={setMeta} />
             <RangeSelector duration={duration} range={range} minClip={minClip} maxClip={maxClip} playhead={playhead}
               onChange={setRange} onScrub={onScrub} onSeek={onScrub} />
           </div>
@@ -346,10 +347,12 @@ export function Studio({ edit }: { edit?: Gif }) {
 
             <section className="space-y-5 border-t border-line pt-6" aria-label="Output settings">
               <Slider label="Frame rate" value={fps} min={5} max={30} step={1} format={(v) => `${v} fps`} onChange={setFps} />
+              <Slider label="Playback speed" value={speed} min={0.25} max={3} step={0.25}
+                format={(v) => `${v}×`} onChange={setSpeed} />
               <Segmented label="Width (px)" value={width} options={widthOptions} onChange={setWidth} />
               <Segmented label="Quality" value={quality} options={QUALITY} onChange={setQuality} />
               <p className="font-mono text-xs text-dim">
-                {seconds(clipLen)} · {frames} frames{effH ? ` · ${effW}×${effH}` : ""}
+                {seconds(clipLen / speed)} at {speed}× · {frames} frames{effH ? ` · ${effW}×${effH}` : ""}
               </p>
               {frames > 900 && (
                 <p className="text-xs text-accent">That&apos;s a lot of frames. Lower the frame rate or width to keep the GIF under {config?.max_gif_mb ?? 20} MB.</p>
@@ -397,7 +400,7 @@ export function Studio({ edit }: { edit?: Gif }) {
               <span className="font-mono text-sm text-dim">{job?.stage === "encoding" || job?.stage === "finalizing" ? `${job.progress}%` : ""}</span>
             </div>
             <p className="text-sm text-dim">
-              Cutting {formatTime(range.start)} to {formatTime(range.end)} at {fps} fps, {effW}px wide.
+              Cutting {formatTime(range.start)} to {formatTime(range.end)} at {fps} fps, {speed}× speed, {effW}px wide.
             </p>
           </div>
           <Progress value={(job?.progress ?? 0) / 100} indeterminate={!job || job.stage === "queued" || job.stage === "analyzing"} />

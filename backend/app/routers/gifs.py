@@ -108,7 +108,8 @@ def _ready_source(db: Session, user: User, public_id: str) -> Source:
     return src
 
 
-def _build_cfg(src: Source, *, start: float, end: float, fps: int, width: int, quality: str) -> dict:
+def _build_cfg(src: Source, *, start: float, end: float, fps: int, width: int, quality: str,
+               speed: float = 1.0) -> dict:
     """Validate a range against the real video and return the settings the encoder will use."""
     duration = (src.duration_ms or 0) / 1000
     start, end = max(0.0, start), min(end, duration)
@@ -122,7 +123,8 @@ def _build_cfg(src: Source, *, start: float, end: float, fps: int, width: int, q
         raise HTTPException(422, f"Clips can be at most {settings.max_clip_s} seconds. Shorten the range.")
     out_w = min(width, src.width or width)
     out_w = max(2, out_w - out_w % 2)
-    return {"start": round(start, 3), "end": round(end, 3), "fps": fps, "width": out_w, "quality": quality}
+    return {"start": round(start, 3), "end": round(end, 3), "fps": fps, "width": out_w,
+            "quality": quality, "speed": speed}
 
 
 def _slug_or_422(raw: str | None) -> str | None:
@@ -140,7 +142,8 @@ def _slug_taken(db: Session, slug: str) -> bool:
 def create_gif(body: GifCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
     limiter.check(f"convert:{user.id}", settings.convert_limit_per_hour, 3600)
     src = _ready_source(db, user, body.source_id)
-    cfg = _build_cfg(src, start=body.start, end=body.end, fps=body.fps, width=body.width, quality=body.quality)
+    cfg = _build_cfg(src, start=body.start, end=body.end, fps=body.fps, width=body.width,
+                     quality=body.quality, speed=body.speed)
     slug = _slug_or_422(body.slug)
     if slug and _slug_taken(db, slug):
         raise HTTPException(409, "That URL is already taken.")
@@ -242,7 +245,8 @@ def regenerate(public_id: str, body: GifRegenerate | None = None, user: User = D
     old_end = cur.get("end") if cur.get("end") is not None else float(cur.get("start", 0)) + float(cur.get("duration", 5))
     cfg = _build_cfg(src, start=start, end=b.end if b.end is not None else float(old_end),
                      fps=b.fps or int(cur.get("fps", 15)), width=b.width or int(cur.get("width", 480)),
-                     quality=b.quality or str(cur.get("quality", "balanced")))
+                     quality=b.quality or str(cur.get("quality", "balanced")),
+                     speed=b.speed if b.speed is not None else float(cur.get("speed", 1.0)))
     gif.pending_settings = cfg
     gif.status, gif.stage, gif.progress, gif.error = "queued", "queued", 0, None
     db.commit()

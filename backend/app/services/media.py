@@ -74,6 +74,16 @@ def _rate(v: str | None) -> float | None:
     return na / nb if na is not None and nb else None
 
 
+def _gif_fps_expr(fps: float) -> str:
+    """Choose a constant frame cadence representable by GIF's 10 ms time base.
+
+    Arbitrary rates such as 15 fps alternate 60/70 ms frame delays in GIF, which can look uneven
+    across players. Quantizing to a whole centisecond gives each frame the same delay.
+    """
+    delay_cs = max(1, round(100 / max(0.1, fps)))
+    return f"100/{delay_cs}"
+
+
 def sniff_container(path: Path) -> str | None:
     """Identify container by magic bytes. Extension and client MIME are never consulted."""
     with open(path, "rb") as f:
@@ -231,6 +241,7 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
     """cfg: start, end (seconds into the source), fps, width, quality. Two passes: palette, then encode."""
     q = QUALITY[cfg["quality"]]
     start, length = float(cfg["start"]), float(cfg["end"]) - float(cfg["start"])
+    speed = float(cfg.get("speed", 1.0))
     fps, width = int(cfg["fps"]), int(cfg["width"])
     workdir = dst.parent
     palette = workdir / "palette.png"
@@ -254,7 +265,7 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
     # Keep the best-fitting encode while searching upward for the largest dimensions that fit.
     # If even the minimum width is too large, progressively reduce FPS, then palette colors.
     limit = settings.max_gif_bytes
-    min_width, min_fps, min_colors = 120, 5, 8
+    min_width, min_fps, min_colors = 64, 1, 2
     encoded_width = max(min_width, width - width % 2)
     encoded_fps, encoded_colors, dither = fps, q["colors"], q["dither"]
     fit_width: int | None = None
@@ -270,7 +281,10 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
         candidate = dst.with_name(f"{dst.stem}.attempt-{attempt}.gif")
 
         on_progress("analyzing", 0.0)
-        palette_filter = (f"fps={min(encoded_fps, 12)},scale={min(encoded_width, 480)}:-2:flags=lanczos,"
+        palette_fps = _gif_fps_expr(min(encoded_fps, 12))
+        output_fps = _gif_fps_expr(encoded_fps)
+        palette_filter = (f"setpts=PTS/{speed:.4f},fps={palette_fps},"
+                  f"scale={min(encoded_width, 480)}:-2:flags=lanczos,"
                           f"palettegen=max_colors={encoded_colors}:stats_mode=diff")
         code, reason, tail = _run_ffmpeg(
             head + seek + ["-an", "-sn", "-dn", "-vf", palette_filter, "-frames:v", "1", "-update", "1",
@@ -281,7 +295,8 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
             raise MediaError("Conversion failed. Try different settings.", 500)
 
         on_progress("encoding", 0.0)
-        graph = (f"[0:v]fps={encoded_fps},scale={encoded_width}:-2:flags=lanczos[x];"
+        graph = (f"[0:v]setpts=PTS/{speed:.4f},fps={output_fps},"
+             f"scale={encoded_width}:-2:flags=lanczos[x];"
                  f"[x][1:v]paletteuse=dither={dither}:diff_mode=rectangle")
         code, reason, tail = _run_ffmpeg(
             head + seek + ["-i", str(palette), "-an", "-sn", "-dn", "-map_metadata", "-1", "-lavfi", graph,
@@ -319,7 +334,7 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
 
             if encoded_colors > min_colors:
                 encoded_colors = max(min_colors, encoded_colors // 2)
-                encoded_fps = fps
+                encoded_fps = min(fps, max(min_fps, encoded_fps))
                 encoded_width, fit_width, failed_width = max(min_width, width - width % 2), None, None
                 dither = "bayer:bayer_scale=5"
                 log.info("GIF still exceeds %s MB; retrying with %s colors", settings.effective_max_gif_mb, encoded_colors)

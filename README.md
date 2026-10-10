@@ -89,6 +89,7 @@ There are no native or Vercel-specific dependencies: only `next`, `react` and `r
 ## Sharing and previews
 
 - `/g/<name>.gif` is the direct file (Discord plays it inline; forums and `<img>` tags work).
+- Share the direct `.gif` URL in Discord (not the `/g/<name>` HTML share page). `PUBLIC_BASE_URL` must be a publicly reachable HTTPS origin; `localhost` links only work on your own computer and cannot be fetched by Discord.
 - `/g/<name>` is a share page with Open Graph and Twitter card metadata (`og:image` is a JPEG poster of the first frame), which WhatsApp, Slack, iMessage and X use for the card. It is `noindex`.
 - `Cache-Control: public, no-cache` with an `ETag`: caches must revalidate every time, so a deleted GIF can't be served from a browser or CDN cache. Unchanged GIFs cost a 304. Third-party platforms that already copied an image (Discord's CDN, a WhatsApp preview) may keep their own copy; no server can recall that.
 
@@ -101,6 +102,7 @@ There are no native or Vercel-specific dependencies: only `next`, `react` and `r
 | Clip length        | 0.2 s to 60 s                      |
 | Output width       | up to 1280 px                      |
 | GIF size           | 20 MB                              |
+| Playback speed     | 0.25× to 3×                        |
 | Source videos kept | 72 h after last use, 8 GB per user |
 
 ## Security notes

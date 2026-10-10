@@ -100,7 +100,8 @@ class Settings(BaseSettings):
 
     @property
     def max_gif_bytes(self) -> int:
-        return self.effective_max_gif_mb * 1024 * 1024
+        # Treat MB as decimal units to honor the strict public file-size ceiling.
+        return self.effective_max_gif_mb * 1_000_000
 
     @property
     def source_quota_bytes(self) -> int:

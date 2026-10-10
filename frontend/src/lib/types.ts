@@ -3,7 +3,7 @@ export type JobStatus = "queued" | "processing" | "done" | "failed";
 export type Stage = "queued" | "analyzing" | "encoding" | "finalizing" | "done" | "failed";
 
 /** What to cut and how to encode it. Times are seconds into the source video. */
-export interface Settings { start: number; end: number; fps: number; width: number; quality: Quality }
+export interface Settings { start: number; end: number; fps: number; width: number; quality: Quality; speed: number }
 
 export interface Source {
   id: string; filename: string; size_bytes: number; received: number;

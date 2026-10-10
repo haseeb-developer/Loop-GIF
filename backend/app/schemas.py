@@ -74,6 +74,7 @@ class RangeSettings(BaseModel):
     fps: int = Field(15, ge=5, le=30)
     width: int = Field(480, ge=120, le=settings.max_output_width)
     quality: Quality = "balanced"
+    speed: float = Field(1.0, ge=0.25, le=3.0)
 
 
 class GifCreate(RangeSettings):
@@ -92,6 +93,7 @@ class GifRegenerate(BaseModel):
     fps: int | None = Field(None, ge=5, le=30)
     width: int | None = Field(None, ge=120, le=settings.max_output_width)
     quality: Quality | None = None
+    speed: float | None = Field(None, ge=0.25, le=3.0)
 
 
 class GifPatch(BaseModel):
