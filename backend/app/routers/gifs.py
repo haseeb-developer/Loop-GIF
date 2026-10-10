@@ -65,7 +65,7 @@ def public_config():
         public_base_url=settings.public_base_url.rstrip("/"), max_upload_bytes=settings.max_upload_bytes, chunk_bytes=settings.chunk_bytes,
         max_input_duration_s=settings.max_input_duration_s, max_input_side_px=settings.max_input_side_px,
         min_clip_s=settings.min_clip_s, max_clip_s=settings.max_clip_s, max_output_width=settings.max_output_width,
-        max_gif_mb=settings.max_gif_mb, source_retention_hours=settings.source_retention_hours,
+        max_gif_mb=settings.effective_max_gif_mb, source_retention_hours=settings.source_retention_hours,
         slug_min=SLUG_MIN, slug_max=SLUG_MAX, formats=["MP4", "MOV", "WebM", "MKV", "AVI"],
     )
 

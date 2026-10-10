@@ -100,7 +100,7 @@ There are no native or Vercel-specific dependencies: only `next`, `react` and `r
 | Source duration    | unlimited                          |
 | Clip length        | 0.2 s to 60 s                      |
 | Output width       | up to 1280 px                      |
-| GIF size           | 125 MB                             |
+| GIF size           | 20 MB                              |
 | Source videos kept | 72 h after last use, 8 GB per user |
 
 ## Security notes

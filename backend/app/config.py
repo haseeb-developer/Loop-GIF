@@ -4,6 +4,8 @@ from pathlib import Path
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MAX_GIF_MB = 20
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -53,7 +55,7 @@ class Settings(BaseSettings):
     min_clip_s: float = 0.2
     max_clip_s: int = 60
     max_output_width: int = 1280
-    max_gif_mb: int = 125
+    max_gif_mb: int = MAX_GIF_MB
 
     # Rate limits
     source_limit_per_hour: int = 30
@@ -93,8 +95,12 @@ class Settings(BaseSettings):
         return min(self.chunk_mb, self.max_chunk_mb) * 1024 * 1024
 
     @property
+    def effective_max_gif_mb(self) -> int:
+        return min(self.max_gif_mb, MAX_GIF_MB)
+
+    @property
     def max_gif_bytes(self) -> int:
-        return self.max_gif_mb * 1024 * 1024
+        return self.effective_max_gif_mb * 1024 * 1024
 
     @property
     def source_quota_bytes(self) -> int:

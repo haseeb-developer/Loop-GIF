@@ -246,55 +246,110 @@ def convert_to_gif(src: Path, dst: Path, cfg: dict, on_progress: Callable[[str, 
         if reason == "stall":
             raise MediaError("Conversion stopped making progress. Try again, or use a shorter clip.", 500)
         if reason == "size":
-            raise MediaError(f"The GIF passed the {settings.max_gif_mb} MB limit. Lower the width, FPS or length.", 500)
+            raise MediaError(f"The GIF passed the {settings.effective_max_gif_mb} MB limit.", 500)
         if code != 0:
             log.error("ffmpeg %s failed (%s): %s", what, code, tail)
             raise MediaError("Conversion failed. Try different settings.", 500)
 
-    # Pass 1: palette from a subsampled copy of the clip. Cheap, and bounded in memory.
-    on_progress("analyzing", 0.0)
-    vf1 = (f"fps={min(fps, 12)},scale={min(width, 480)}:-2:flags=lanczos,"
-           f"palettegen=max_colors={q['colors']}:stats_mode=diff")
-    code, reason, tail = _run_ffmpeg(
-        head + seek + ["-an", "-sn", "-dn", "-vf", vf1, "-frames:v", "1", "-update", "1", "-f", "image2", "-y",
-                       str(palette)],
-        cancel=cancel, timeout=settings.ffmpeg_timeout_s, cwd=workdir)
-    check(code, reason, tail, "palette")
-    if not palette.exists():
-        raise MediaError("Conversion failed. Try different settings.", 500)
+    # Keep the best-fitting encode while searching upward for the largest dimensions that fit.
+    # If even the minimum width is too large, progressively reduce FPS, then palette colors.
+    limit = settings.max_gif_bytes
+    min_width, min_fps, min_colors = 120, 5, 8
+    encoded_width = max(min_width, width - width % 2)
+    encoded_fps, encoded_colors, dither = fps, q["colors"], q["dither"]
+    fit_width: int | None = None
+    failed_width: int | None = None
+    best_path: Path | None = None
+    best_size = 0
+    best_width, best_fps, best_colors = encoded_width, encoded_fps, encoded_colors
+    attempt = 0
 
-    # Pass 2: encode with that palette. Real progress comes from FFmpeg's own output position.
-    on_progress("encoding", 0.0)
-    encoded_width = width
     while True:
-        graph = (f"[0:v]fps={fps},scale={encoded_width}:-2:flags=lanczos[x];"
-                 f"[x][1:v]paletteuse=dither={q['dither']}:diff_mode=rectangle")
+        attempt += 1
+        palette = workdir / f"palette-{attempt}.png"
+        candidate = dst.with_name(f"{dst.stem}.attempt-{attempt}.gif")
+
+        on_progress("analyzing", 0.0)
+        palette_filter = (f"fps={min(encoded_fps, 12)},scale={min(encoded_width, 480)}:-2:flags=lanczos,"
+                          f"palettegen=max_colors={encoded_colors}:stats_mode=diff")
+        code, reason, tail = _run_ffmpeg(
+            head + seek + ["-an", "-sn", "-dn", "-vf", palette_filter, "-frames:v", "1", "-update", "1",
+                           "-f", "image2", "-y", str(palette)],
+            cancel=cancel, timeout=settings.ffmpeg_timeout_s, cwd=workdir)
+        check(code, reason, tail, "palette")
+        if not palette.exists():
+            raise MediaError("Conversion failed. Try different settings.", 500)
+
+        on_progress("encoding", 0.0)
+        graph = (f"[0:v]fps={encoded_fps},scale={encoded_width}:-2:flags=lanczos[x];"
+                 f"[x][1:v]paletteuse=dither={dither}:diff_mode=rectangle")
         code, reason, tail = _run_ffmpeg(
             head + seek + ["-i", str(palette), "-an", "-sn", "-dn", "-map_metadata", "-1", "-lavfi", graph,
-                           "-loop", "0", "-progress", "pipe:1", "-f", "gif", "-y", str(dst)],
+                           "-loop", "0", "-progress", "pipe:1", "-f", "gif", "-y", str(candidate)],
             cancel=cancel, timeout=settings.ffmpeg_timeout_s, cwd=workdir,
             on_frac=lambda f: on_progress("encoding", f), total_us=length * 1_000_000,
-            stall=settings.ffmpeg_stall_s, size_path=dst)
-        too_large = reason == "size"
-        if not too_large and code == 0 and dst.is_file():
-            too_large = dst.stat().st_size > settings.max_gif_bytes
-        if not too_large or encoded_width <= 320:
-            check(code, reason, tail, "encode")
-            break
-        # Retry with a smaller image rather than failing an otherwise valid conversion at the size cap.
-        encoded_width = max(320, (int(encoded_width * 0.8) // 2) * 2)
-        log.info("GIF exceeded %s MB; retrying at %s px wide", settings.max_gif_mb, encoded_width)
+            stall=settings.ffmpeg_stall_s, size_path=candidate)
+        size = candidate.stat().st_size if candidate.is_file() else 0
+        too_large = reason == "size" or size > limit
+        palette.unlink(missing_ok=True)
 
-    if encoded_width != width:
-        cfg["width"] = encoded_width
-    if not dst.exists():
-        raise MediaError("Conversion failed. Try different settings.", 500)
-    palette.unlink(missing_ok=True)
+        if too_large:
+            candidate.unlink(missing_ok=True)
+            if encoded_width > min_width:
+                failed_width = encoded_width
+                if fit_width is None:
+                    ratio = min(0.92, (limit / max(size, limit + 1)) ** 0.5 * 0.92)
+                    next_width = max(min_width, int(encoded_width * ratio) // 2 * 2)
+                    if next_width >= encoded_width:
+                        next_width = encoded_width - 2
+                elif failed_width - fit_width > 16:
+                    next_width = ((fit_width + failed_width) // 4) * 2
+                else:
+                    break  # best_path is already the highest tested width within the cap
+                encoded_width = max(min_width, next_width)
+                log.info("GIF exceeded %s MB; retrying at %s px", settings.effective_max_gif_mb, encoded_width)
+                continue
 
+            if encoded_fps > min_fps:
+                ratio = max(0.35, min(0.8, limit / max(size, limit + 1) * 0.9))
+                encoded_fps = max(min_fps, min(encoded_fps - 1, int(encoded_fps * ratio)))
+                encoded_width, fit_width, failed_width = max(min_width, width - width % 2), None, None
+                log.info("GIF still exceeds %s MB; retrying at %s fps", settings.effective_max_gif_mb, encoded_fps)
+                continue
+
+            if encoded_colors > min_colors:
+                encoded_colors = max(min_colors, encoded_colors // 2)
+                encoded_fps = fps
+                encoded_width, fit_width, failed_width = max(min_width, width - width % 2), None, None
+                dither = "bayer:bayer_scale=5"
+                log.info("GIF still exceeds %s MB; retrying with %s colors", settings.effective_max_gif_mb, encoded_colors)
+                continue
+
+            raise MediaError(f"Couldn't fit this clip under {settings.effective_max_gif_mb} MB, even at the minimum dimensions, FPS and colors.", 500)
+
+        check(code, reason, tail, "encode")
+        if size <= 0:
+            raise MediaError("Conversion failed. Try different settings.", 500)
+        if best_path is not None:
+            best_path.unlink(missing_ok=True)
+        best_path, best_size = candidate, size
+        best_width, best_fps, best_colors = encoded_width, encoded_fps, encoded_colors
+        fit_width = encoded_width
+
+        if failed_width is not None and failed_width - fit_width > 16:
+            encoded_width = ((fit_width + failed_width) // 4) * 2
+            continue
+        break
+
+    if best_path is None or best_size > limit:
+        raise MediaError(f"Couldn't produce a GIF under {settings.effective_max_gif_mb} MB.", 500)
+    os.replace(best_path, dst)
+    cfg["width"], cfg["fps"] = best_width, best_fps
+    cfg["quality"] = "low" if best_colors <= 64 else "balanced" if best_colors <= 128 else "high"
     size = dst.stat().st_size
-    if size > settings.max_gif_bytes:
-        raise MediaError(f"The GIF is {size / 1048576:.0f} MB, over the {settings.max_gif_mb} MB limit. "
-                         "Lower the width, FPS or length.", 500)
+    if size > limit:
+        dst.unlink(missing_ok=True)
+        raise MediaError("Final GIF exceeded the 20 MB safety limit.", 500)
     info = _probe(dst, timeout=30)
     vs = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     real = _num(info.get("format", {}).get("duration")) or length
