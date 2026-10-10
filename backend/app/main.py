@@ -7,9 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import migrate, models  # noqa: F401  (models must be imported so create_all sees every table)
+from . import migrate, models
 from .config import settings
-from .db import Base, engine
+from .db import engine
 from .routers import auth, gifs, public, sources
 from .services import jobs, maintenance
 
@@ -44,7 +44,7 @@ _stop = threading.Event()
 async def lifespan(_: FastAPI):
     for d in (settings.source_dir, settings.tmp_dir):
         d.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(engine)
+    models.Base.metadata.create_all(engine)
     migrate.run(engine)
     jobs.recover_on_startup()
     maintenance.sweep_once()

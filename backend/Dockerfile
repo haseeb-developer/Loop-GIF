@@ -10,4 +10,4 @@ COPY app ./app
 USER app
 EXPOSE 8000
 # Single process on purpose: rate limiter and job pool are in-process (see README "Scaling").
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers"]

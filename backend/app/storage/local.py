@@ -50,4 +50,5 @@ class LocalStorage:
         return p if p.is_file() else None
 
     def public_redirect(self, key: str) -> str | None:
+        _ = key
         return None

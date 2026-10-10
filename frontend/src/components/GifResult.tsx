@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { buttonClass } from "@/lib/button";
 import { bytes, seconds } from "@/lib/format";
 import type { Gif } from "@/lib/types";
-import { Badge, Button, CopyField, LinkButton, buttonClass } from "./ui";
+import { Badge, Button, CopyField, LinkButton } from "./ui";
 import { DownloadIcon, EditIcon, LinkIcon, PencilIcon, ShareIcon, TrashIcon } from "./icons";
 import { useGifDialogs } from "./GifDialogs";
 

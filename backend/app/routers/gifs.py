@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, or_, select
@@ -11,7 +11,16 @@ from ..db import get_db
 from ..deps import current_user
 from ..models import Gif, Source, User
 from ..ratelimit import limiter
-from ..schemas import (GifCreate, GifList, GifOut, GifPatch, GifRegenerate, PublicConfig, SlugCheck, SourceBrief)
+from ..schemas import (
+    GifCreate,
+    GifList,
+    GifOut,
+    GifPatch,
+    GifRegenerate,
+    PublicConfig,
+    SlugCheck,
+    SourceBrief,
+)
 from ..security import new_public_id
 from ..services import jobs
 from ..services.slugs import SLUG_MAX, SLUG_MIN, SlugError, validate_slug
@@ -23,6 +32,8 @@ from ..timeutils import is_expired
 router = APIRouter(prefix="/api/gifs", tags=["gifs"])
 config_router = APIRouter(prefix="/api", tags=["config"])
 ACTIVE = ("queued", "processing")
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(current_user)]
 
 
 def gif_out(g: Gif, src: Source | None) -> GifOut:
@@ -71,8 +82,9 @@ def public_config():
 
 
 @config_router.get("/slugs/check", response_model=SlugCheck)
-def check_slug(slug: str = Query("", max_length=60), gif_id: str | None = Query(None, max_length=32),
-               user: User = Depends(current_user), db: Session = Depends(get_db)):
+def check_slug(user: CurrentUser, db: DbSession,
+               slug: Annotated[str, Query(max_length=60)] = "",
+               gif_id: Annotated[str | None, Query(max_length=32)] = None):
     limiter.check(f"slug:{user.id}", 120, 60)
     try:
         clean = validate_slug(slug)
@@ -108,6 +120,11 @@ def _ready_source(db: Session, user: User, public_id: str) -> Source:
     return src
 
 
+def _setting_number(values: dict, key: str, default: float) -> float:
+    value = values.get(key)
+    return float(value) if isinstance(value, (int, float)) else default
+
+
 def _build_cfg(src: Source, *, start: float, end: float, fps: int, width: int, quality: str,
                speed: float = 1.0) -> dict:
     """Validate a range against the real video and return the settings the encoder will use."""
@@ -139,7 +156,7 @@ def _slug_taken(db: Session, slug: str) -> bool:
 
 
 @router.post("", response_model=GifOut, status_code=202)
-def create_gif(body: GifCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def create_gif(body: GifCreate, user: CurrentUser, db: DbSession):
     limiter.check(f"convert:{user.id}", settings.convert_limit_per_hour, 3600)
     src = _ready_source(db, user, body.source_id)
     cfg = _build_cfg(src, start=body.start, end=body.end, fps=body.fps, width=body.width,
@@ -170,11 +187,11 @@ def create_gif(body: GifCreate, user: User = Depends(current_user), db: Session 
 
 @router.get("", response_model=GifList)
 def list_gifs(
+    user: CurrentUser, db: DbSession,
     q: str | None = Query(None, max_length=100),
     status: Literal["all", "ready", "processing", "failed"] = "all",
     sort: Literal["recent", "created", "oldest", "name", "size"] = "recent",
     limit: int = Query(48, ge=1, le=100), offset: int = Query(0, ge=0),
-    user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     where = [Gif.user_id == user.id]
     if q and q.strip():
@@ -202,12 +219,12 @@ def list_gifs(
 
 
 @router.get("/{public_id}", response_model=GifOut)
-def get_gif(public_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_gif(public_id: str, user: CurrentUser, db: DbSession):
     return _out(db, _owned(db, user, public_id))
 
 
 @router.patch("/{public_id}", response_model=GifOut)
-def update_gif(public_id: str, body: GifPatch, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def update_gif(public_id: str, body: GifPatch, user: CurrentUser, db: DbSession):
     gif = _owned(db, user, public_id)
     if body.title is not None:
         if not body.title.strip():
@@ -227,8 +244,7 @@ def update_gif(public_id: str, body: GifPatch, user: User = Depends(current_user
 
 
 @router.post("/{public_id}/regenerate", response_model=GifOut, status_code=202)
-def regenerate(public_id: str, body: GifRegenerate | None = None, user: User = Depends(current_user),
-               db: Session = Depends(get_db)):
+def regenerate(public_id: str, user: CurrentUser, db: DbSession, body: GifRegenerate | None = None):
     """Re-encode from the stored source into the same URL. The current GIF keeps serving until the new one is ready."""
     gif = _owned(db, user, public_id)
     if gif.status in ACTIVE:
@@ -241,10 +257,13 @@ def regenerate(public_id: str, body: GifRegenerate | None = None, user: User = D
     _check_capacity(db, user)
 
     cur, b = gif.settings or {}, body or GifRegenerate()
-    start = b.start if b.start is not None else float(cur.get("start", 0))
-    old_end = cur.get("end") if cur.get("end") is not None else float(cur.get("start", 0)) + float(cur.get("duration", 5))
-    cfg = _build_cfg(src, start=start, end=b.end if b.end is not None else float(old_end),
-                     fps=b.fps or int(cur.get("fps", 15)), width=b.width or int(cur.get("width", 480)),
+    current_start = _setting_number(cur, "start", 0.0)
+    current_duration = _setting_number(cur, "duration", 5.0)
+    current_end = _setting_number(cur, "end", current_start + current_duration)
+    start = b.start if b.start is not None else current_start
+    cfg = _build_cfg(src, start=start, end=b.end if b.end is not None else current_end,
+                    fps=b.fps or int(_setting_number(cur, "fps", 15)),
+                    width=b.width or int(_setting_number(cur, "width", 480)),
                      quality=b.quality or str(cur.get("quality", "balanced")),
                      speed=b.speed if b.speed is not None else float(cur.get("speed", 1.0)))
     gif.pending_settings = cfg
@@ -255,7 +274,7 @@ def regenerate(public_id: str, body: GifRegenerate | None = None, user: User = D
 
 
 @router.post("/{public_id}/cancel", status_code=204)
-def cancel_gif(public_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def cancel_gif(public_id: str, user: CurrentUser, db: DbSession):
     """Stop a running conversion. A GIF that never finished is removed; a live one reverts to its current version."""
     gif = _owned(db, user, public_id)
     if gif.status not in ACTIVE:
@@ -266,7 +285,7 @@ def cancel_gif(public_id: str, user: User = Depends(current_user), db: Session =
 
 
 @router.delete("/{public_id}", status_code=204)
-def delete_gif(public_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def delete_gif(public_id: str, user: CurrentUser, db: DbSession):
     """The row goes first, in its own commit, so the public URL stops resolving immediately."""
     gif = _owned(db, user, public_id)
     keys = [k for k in (gif.storage_key, gif.poster_key) if k]

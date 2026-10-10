@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MAX_GIF_MB = 20
@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     frame_limit_per_minute: int = 240
     login_limit_per_15min: int = 10
     signup_limit_per_hour: int = 10
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_driver(cls, value: object) -> object:
+        # Managed Postgres providers expose a generic URL; use the psycopg v3 driver installed here.
+        if isinstance(value, str) and value.startswith(("postgres://", "postgresql://")):
+            return value.replace("postgres://", "postgresql+psycopg://", 1).replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+        return value
 
     @model_validator(mode="after")
     def resolve_storage_paths(self) -> "Settings":

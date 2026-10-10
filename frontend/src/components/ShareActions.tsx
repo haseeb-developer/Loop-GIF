@@ -1,6 +1,7 @@
 "use client";
 import { copyText } from "@/lib/format";
-import { buttonClass, Button } from "./ui";
+import { buttonClass } from "@/lib/button";
+import { Button } from "./ui";
 import { CopyIcon, DownloadIcon, LinkIcon } from "./icons";
 import { useToast } from "./Toast";
 

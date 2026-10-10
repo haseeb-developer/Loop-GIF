@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { forwardRef, useEffect, useId, useRef, useState } from "react";
+import { buttonClass, type ButtonSize, type ButtonVariant } from "@/lib/button";
 import { copyText } from "@/lib/format";
 import { CheckIcon, CopyIcon, MoreIcon, XIcon } from "./icons";
 import { useToast } from "./Toast";
@@ -8,21 +9,6 @@ import { useToast } from "./Toast";
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 /* ------------------------------------------------------------------ buttons */
-
-type Variant = "primary" | "secondary" | "ghost" | "danger";
-type Size = "sm" | "md" | "lg" | "icon";
-
-const base = "inline-flex items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap select-none " +
-  "transition duration-150 active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none";
-const variants: Record<Variant, string> = {
-  primary: "bg-accent text-accent-fg hover:brightness-110",
-  secondary: "bg-raised text-fg border border-line hover:bg-hover hover:border-line-strong",
-  ghost: "text-dim hover:text-fg hover:bg-hover",
-  danger: "bg-raised text-danger border border-line hover:border-danger/60 hover:bg-danger/10",
-};
-const sizes: Record<Size, string> = { sm: "h-8 px-3 text-sm", md: "h-10 px-4 text-sm", lg: "h-11 px-5 text-sm", icon: "h-8 w-8" };
-
-export const buttonClass = (v: Variant = "secondary", s: Size = "md", extra = "") => cx(base, variants[v], sizes[s], extra);
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -33,7 +19,7 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> { variant?: Variant; size?: Size; loading?: boolean }
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> { variant?: ButtonVariant; size?: ButtonSize; loading?: boolean }
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = "secondary", size = "md", loading, className, children, disabled, type = "button", ...rest }, ref) {
   return (
@@ -44,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 export function LinkButton({ href, variant = "secondary", size = "md", className, children, ...rest }:
-  { href: string; variant?: Variant; size?: Size } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
+  { href: string; variant?: ButtonVariant; size?: ButtonSize } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
   return <Link href={href} className={buttonClass(variant, size, className)} {...rest}>{children}</Link>;
 }
 

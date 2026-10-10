@@ -88,12 +88,12 @@ class GifRegenerate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    start: float | None = Field(None, ge=0, allow_inf_nan=False)
-    end: float | None = Field(None, gt=0, allow_inf_nan=False)
-    fps: int | None = Field(None, ge=5, le=30)
-    width: int | None = Field(None, ge=120, le=settings.max_output_width)
+    start: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    end: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    fps: int | None = Field(default=None, ge=5, le=30)
+    width: int | None = Field(default=None, ge=120, le=settings.max_output_width)
     quality: Quality | None = None
-    speed: float | None = Field(None, ge=0.25, le=3.0)
+    speed: float | None = Field(default=None, ge=0.25, le=3.0)
 
 
 class GifPatch(BaseModel):

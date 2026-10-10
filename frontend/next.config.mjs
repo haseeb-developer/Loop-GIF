@@ -5,8 +5,10 @@
  * (Video chunks are the exception: they go straight to the API, see UPLOAD_BASE_URL in the README.)
  */
 const api = (process.env.API_ORIGIN || "").replace(/\/+$/, "");
-if (!api && (process.env.VERCEL || process.env.NODE_ENV === "production")) {
-  console.warn("[loop] API_ORIGIN is not set. /api requests will fail until you set it and redeploy.");
+if (process.env.VERCEL && (!api || /localhost|127\.0\.0\.1/i.test(api))) {
+  throw new Error(
+    "Set API_ORIGIN to the public HTTPS origin of the deployed Loop API in Vercel before building.",
+  );
 }
 const target = api || "http://localhost:8000";
 
@@ -20,20 +22,27 @@ const config = {
     return {
       // Run before filesystem routes so /g/name.gif is never mistaken for the /g/[name] page.
       beforeFiles: [
-        { source: "/g/:file([0-9A-Za-z_-]{3,40}\\.(?:gif|jpg))", destination: `${target}/g/:file` },
+        {
+          source: "/g/:file([0-9A-Za-z_-]{3,40}\\.(?:gif|jpg))",
+          destination: `${target}/g/:file`,
+        },
       ],
-      afterFiles: [{ source: "/api/:path*", destination: `${target}/api/:path*` }],
+      afterFiles: [
+        { source: "/api/:path*", destination: `${target}/api/:path*` },
+      ],
       fallback: [],
     };
   },
   async headers() {
-    return [{
-      source: "/:path*",
-      headers: [
-        { key: "X-Content-Type-Options", value: "nosniff" },
-        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      ],
-    }];
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
   },
 };
 export default config;

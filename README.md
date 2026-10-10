@@ -50,36 +50,48 @@ python -m uvicorn app.main:app --reload
 
 Keep the frontend dev server running in another terminal at http://localhost:3000. SQLite creates a new local database, so create an account at `/signup` before signing in. This is intended for local development; use PostgreSQL for deployment.
 
-## Deploy: GitHub → Vercel (web) + Docker host (API)
+## Deploy: GitHub → Vercel (web) + Railway (API)
 
-### 1. API (Docker host)
+Vercel deploys the Next.js frontend only. The FastAPI backend cannot run as a Vercel deployment: it needs FFmpeg, a persistent filesystem, Postgres, and a long-running worker for conversions. Deploy the API separately to Railway; the committed [backend/Railway configuration](backend/railway.toml) builds its Dockerfile, honors Railway's `PORT`, and health-checks `/healthz`.
 
-Run `backend/` and Postgres (see `docker-compose.yml`; `api` + `db` services are enough). Put it behind HTTPS at e.g. `https://api.example.com`, with a persistent volume at `/data`. Environment:
+### 1. API (Railway)
 
-| Variable            | Value                                                                   |
-| ------------------- | ----------------------------------------------------------------------- |
-| `DATABASE_URL`      | `postgresql+psycopg://user:pass@host:5432/db`                           |
-| `SECRET_KEY`        | 32+ random characters                                                   |
-| `COOKIE_SECURE`     | `true`                                                                  |
-| `TRUST_PROXY`       | `true` if behind a proxy you control (correct per-IP rate limits)       |
-| `CORS_ORIGINS`      | `https://your-app.vercel.app` (and your custom domain), comma separated |
-| `CORS_ORIGIN_REGEX` | optional, `https://.*\.vercel\.app` to allow preview deployments        |
-| `PUBLIC_BASE_URL`   | origin used in copied GIF links (see below)                             |
-| `UPLOAD_BASE_URL`   | **the API origin**, `https://api.example.com`                           |
-| `WEB_BASE_URL`      | `https://your-app.vercel.app`                                           |
+1. Create a Railway project from this GitHub repository and add a PostgreSQL service.
+2. Add a service from the same repository with **Root Directory** `backend`; Railway uses `backend/railway.toml` and `backend/Dockerfile`.
+3. Attach a persistent Railway volume mounted at `/data`. GIFs and source videos are stored there; an ephemeral filesystem loses them on redeploy.
+4. Set these API service variables (Railway's generated `postgres://`/`postgresql://` database URL is normalized to psycopg3 automatically):
 
-`PUBLIC_BASE_URL` choice: the API origin keeps GIF traffic off Vercel (cheapest, fastest). Your Vercel domain gives prettier same-domain links (`your-app.com/g/cat_edit.gif`), but every GIF view is proxied through Vercel and counts against its bandwidth. Either works. `UPLOAD_BASE_URL` must always be the API itself.
+| Variable            | Value                                                                 |
+| ------------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`      | `${{Postgres.DATABASE_URL}}` (Railway variable reference)              |
+| `SECRET_KEY`        | At least 32 random characters                                         |
+| `COOKIE_SECURE`     | `true`                                                                |
+| `TRUST_PROXY`       | `true` when Railway's trusted proxy supplies client IPs               |
+| `CORS_ORIGINS`      | Exact Vercel production origin and custom web domain, comma separated |
+| `CORS_ORIGIN_REGEX` | Optional: `https://.*\.vercel\.app` for preview deployments          |
+| `PUBLIC_BASE_URL`   | Public API origin, e.g. `https://loop-api-production.up.railway.app`  |
+| `UPLOAD_BASE_URL`   | The same public API origin; video chunks upload directly here         |
+| `WEB_BASE_URL`      | Vercel production origin, e.g. `https://loop-gif.vercel.app`          |
+
+Generate a Railway public domain for the API. Keep `PUBLIC_BASE_URL` and `UPLOAD_BASE_URL` set to that API domain so Discord can fetch direct GIFs and large video chunks bypass Vercel. Do not use `localhost` in production.
 
 ### 2. Web (Vercel)
 
 1. Push the repo to GitHub and import it in Vercel.
 2. Set **Root Directory** to `frontend`. The framework is detected as Next.js; no build overrides are needed.
-3. Add the environment variable `API_ORIGIN=https://api.example.com` (no trailing slash) for Production and Preview.
+3. Add `API_ORIGIN=https://<your-public-railway-api-domain>` (no trailing slash) for Production and Preview. Also allow those web origins in the Railway API's `CORS_ORIGINS`.
 4. Deploy. `API_ORIGIN` is read at build time for the rewrites, and at runtime by the share page, so **changing it needs a redeploy**.
 
 There are no native or Vercel-specific dependencies: only `next`, `react` and `react-dom`. `output: "standalone"` is only enabled for the Docker image (`DOCKER_BUILD`), never on Vercel.
 
-### 3. Check it
+### 3. Verify both services
+
+- Railway API: open `https://<api-domain>/healthz`; it must return `{"ok":true}`.
+- Vercel web: open `/api/config`; it must return API configuration (not a 404/502). Verify its `public_base_url` is the public API domain.
+- Sign up, upload, convert, then open the direct `.gif` URL. It must return HTTP 200 and `Content-Type: image/gif`.
+- Railway must keep its Postgres service and `/data` volume attached. Vercel does not deploy or host these backend services.
+
+### 4. Check it
 
 - Sign up on the Vercel URL, upload a video, convert.
 - Open the direct link: `Content-Type: image/gif`.

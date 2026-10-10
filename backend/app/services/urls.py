@@ -1,8 +1,18 @@
+from typing import TypedDict
+
 from ..config import settings
 from ..models import Gif
 
 
-def gif_urls(g: Gif) -> dict[str, str | None]:
+class GifUrls(TypedDict):
+    url: str
+    permanent_url: str
+    download_url: str
+    poster_url: str | None
+    share_path: str
+
+
+def gif_urls(g: Gif) -> GifUrls:
     """Public URLs for a GIF. The vanity name is used when set; the random id URL always works too."""
     base = settings.public_base_url.rstrip("/")
     name = g.slug or g.public_id

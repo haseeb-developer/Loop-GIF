@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +15,8 @@ from ..security import create_session_token, hash_password, verify_password
 from ..services.sources import used_bytes
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(current_user)]
 
 
 def _set_cookie(resp: Response, user_id: int) -> None:
@@ -25,12 +29,12 @@ def _user_out(db: Session, user: User) -> UserOut:
         select(func.count(Gif.id), func.coalesce(func.sum(Gif.size_bytes), 0)).where(Gif.user_id == user.id)
     ).one()
     return UserOut(email=user.email, display_name=user.display_name, created_at=user.created_at,
-                   gif_count=count, storage_bytes=int(total), source_bytes=used_bytes(db, user.id),
+                   gif_count=int(count or 0), storage_bytes=int(total or 0), source_bytes=used_bytes(db, user.id),
                    source_quota_bytes=settings.source_quota_bytes)
 
 
 @router.post("/signup", response_model=UserOut, status_code=201)
-def signup(body: SignupIn, request: Request, response: Response, db: Session = Depends(get_db)):
+def signup(body: SignupIn, request: Request, response: Response, db: DbSession):
     limiter.check(f"signup:{client_ip(request)}", settings.signup_limit_per_hour, 3600)
     user = User(email=body.email.lower().strip(), display_name=body.display_name.strip(),
                 password_hash=hash_password(body.password))
@@ -45,7 +49,7 @@ def signup(body: SignupIn, request: Request, response: Response, db: Session = D
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, response: Response, db: DbSession):
     email = body.email.lower().strip()
     limiter.check(f"login-ip:{client_ip(request)}", settings.login_limit_per_15min, 900)
     limiter.check(f"login-email:{email}", settings.login_limit_per_15min, 900)
@@ -62,5 +66,5 @@ def logout(response: Response):
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def me(user: CurrentUser, db: DbSession):
     return _user_out(db, user)

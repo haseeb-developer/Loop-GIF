@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { buttonClass } from "@/lib/button";
 import { Logo } from "@/components/Header";
-import { buttonClass } from "@/components/ui";
 
 export default function NotFound() {
   return (
